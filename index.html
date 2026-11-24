@@ -7,8 +7,9 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
   <script>
-    // Same-origin when (served by server.js (localhost:5000 or your deployed URL); otherwise talk to the local backend
-    const API_BASE_URL = 'https://virtual-stock-trading-app.onrender.com/api';
+    const API_BASE_URL = (window.location.hostname === 'dwijesh2911-cyber.github.io' || window.location.protocol === 'file:')
+      ? 'https://virtual-stock-trading-app.onrender.com/api'
+      : '/api';
   </script>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
@@ -623,7 +624,6 @@
       let maxP = Math.max(...history.map(d => d.high));
       const range = (maxP - minP) || 1;
       
-      // Price Padding so candles don't touch top/bottom edges
       const pricePad = range * 0.05;
       minP -= pricePad;
       maxP += pricePad;
@@ -635,8 +635,7 @@
       const chartH = canvas.height - pad * 2; 
       const step = chartW / history.length;
 
-      // Draw Grid & Y-Axis Labels
-      ctx.fillStyle = '#94a3b8'; // text-slate-400
+      ctx.fillStyle = '#94a3b8';
       ctx.font = '10px monospace';
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
@@ -644,29 +643,24 @@
 
       const numTicks = 5;
       for (let i = 0; i <= numTicks; i++) {
-        // Calculate the price for this tick (from top to bottom)
         const priceTick = maxP - (adjRange * (i / numTicks));
         const y = pad + (i / numTicks) * chartH;
 
-        // Faint horizontal grid line
         ctx.beginPath();
         ctx.moveTo(0, y);
         ctx.lineTo(chartW, y);
-        ctx.strokeStyle = 'rgba(30, 41, 59, 0.6)'; // faintly visible line
+        ctx.strokeStyle = 'rgba(30, 41, 59, 0.6)';
         ctx.stroke();
 
-        // Price label on the Y-Axis
         ctx.fillText(priceTick.toFixed(2), chartW + 5, y);
       }
 
-      // Draw vertical separator line for the Y-Axis
       ctx.beginPath();
       ctx.moveTo(chartW, 0);
       ctx.lineTo(chartW, canvas.height);
       ctx.strokeStyle = '#1e293b'; 
       ctx.stroke();
 
-      // Draw Candlesticks or Line Chart
       if (chartType === 'candlestick') {
         history.forEach((d, i) => {
           const x = i * step + step / 2;
@@ -748,7 +742,7 @@
           if (userAccount.holdings[activeSymbol].quantity === 0) delete userAccount.holdings[activeSymbol];
         }
         userAccount.history.unshift(tradeRecord);
-        showNotice(`Filled: ${currentSide} ${qty} ${activeSymbol} @ ₹${price.toFixed(2)}`, true);
+        showNotice(`Filled: ${currentSide}${qty} ${activeSymbol} @ ₹${price.toFixed(2)}`, true);
         refreshUI(); calculateOrderEstimate();
       } catch (err) { showNotice('Sync failed.', false); }
     }
@@ -766,7 +760,7 @@
         investedVal += h.quantity * h.avgPrice;
         currentHoldingsVal += h.quantity * (marketData[sym]?.price || h.avgPrice);
       });
-      const netWorth = userAccount.cash + currentHoldingsVal, unrealizedPnL = currentHoldingsVal - investedVal;
+      const netWorth = userAccount.cash + currentHoldingsVal;
       
       document.getElementById('statNetWorth').textContent = `₹${netWorth.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
       document.getElementById('statAvailableCash').textContent = `₹${userAccount.cash.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
@@ -792,61 +786,7 @@
       const tBodyHistory = document.getElementById('transactionTableBody'); tBodyHistory.innerHTML = '';
       userAccount.history.forEach(tx => {
         const displayTime = tx.time.includes('T') ? new Date(tx.time).toLocaleTimeString() : tx.time;
-        tBodyHistory.innerHTML += `<tr><td class="p-3 text-slate-400">${displayTime}</td><td class="p-3 font-bold ${tx.type === 'BUY' ? 'text-emerald-400' : 'text-rose-400'}">${tx.type}</td><td class="p-3 font-bold text-white">${tx.symbol}</td><td class="p-3 text-right">${tx.quantity}</td><td class="p-3 text-right">₹${tx.total.toFixed(2)}</td></tr>`;
-      });
-    }
-
-    window.addEventListener('DOMContentLoaded', () => {
-      renderWatchlist(); selectSymbol('RELIANCE'); initAuth();
-      document.getElementById('marketCanvas').addEventListener('wheel', (e) => { e.preventDefault(); zoomChart(e.deltaY < 0 ? 1 : -1); });
-    });
-    window.addEventListener('resize', drawChart);
-  </script>
-<script>
-/* ===================== AUTH: LOGIN / REGISTER / LOGOUT ===================== */
-const AUTH_STORE = 'apex_auth_v1';
-let AUTH_TOKEN = null, CURRENT_USER = null, authMode = 'login';
-
-function authHeaders(json) {
-  const h = {};
-  if (json) h['Content-Type'] = 'application/json';
-  if (AUTH_TOKEN) h['Authorization'] = 'Bearer ' + AUTH_TOKEN;
-  return h;
-}
-function authError(msg) {
-  const el = document.getElementById('authError');
-  el.textContent = msg || ''; el.classList.toggle('hidden', !msg);
-}
-function showAuth(msg) {
-  document.getElementById('authOverlay').classList.remove('hidden');
-  setAuthTab(authMode); authError(msg || '');
-}
-function hideAuth() { document.getElementById('authOverlay').classList.add('hidden'); }
-
-function setAuthTab(mode) {
-  authMode = mode;
-  const reg = mode === 'register';
-  document.getElementById('authNameWrap').classList.toggle('hidden', !reg);
-  document.getElementById('authConfirmWrap').classList.toggle('hidden', !reg);
-  document.getElementById('authPwHint').textContent = reg ? '(minimum 8 characters)' : '';
-  document.getElementById('authIdHint').textContent = reg ? '(3-20 letters, numbers or _)' : '';
-  document.getElementById('authFoot').textContent = reg ? 'New accounts start with ₹10,00,000 virtual cash.' : 'No account yet? Click Register above.';
-  document.getElementById('authPassword').autocomplete = reg ? 'new-password' : 'current-password';
-  document.getElementById('authSubmit').textContent = reg ? 'Create account' : 'Login';
-  const on = 'bg-accentBlue text-white', off = 'text-slate-400 hover:text-white';
-  document.getElementById('authTabLogin').className = 'py-2 rounded-md ' + (reg ? off : on);
-  document.getElementById('authTabRegister').className = 'py-2 rounded-md ' + (reg ? on : off);
-  authError('');
-}
-
-async function submitAuth(e) {
-  e.preventDefault();
-  const userId = document.getElementById('authUser').value.trim().toLowerCase();
-  const password = document.getElementById('authPassword').value;
-  const name = document.getElementById('authName').value.trim();
-  const btn = document.getElementById('authSubmit');
-  if (!userId) return authError('Enter your ID.');
-  if (!password) return authError('Enter your password.');
+        tBodyHistory.innerHTML += `<tr><td class="p-3 text-slate-400">${displayTime}</td><td class="p-3 font-bold ${tx.type === 'BUY' ? 'text-emerald-400' : 'text-rose-400'}">${tx.type}</td><td class="p-3 font-bold text-white">${tx.symbol}</td><td class="p-3 text-right">${tx.quantity}</td><td class="p-3 text-right">₹${tx.total.toFixed(2)}</td></tr>`; }); }  window.addEventListener('DOMContentLoaded', () => { renderWatchlist(); selectSymbol('RELIANCE'); initAuth(); document.getElementById('marketCanvas').addEventListener('wheel', (e) => { e.preventDefault(); zoomChart(e.deltaY < 0 ? 1 : -1); }); }); window.addEventListener('resize', drawChart); </script> <script> /* ===================== AUTH: LOGIN / REGISTER / LOGOUT ===================== */ const AUTH_STORE = 'apex_auth_v1'; let AUTH_TOKEN = null, CURRENT_USER = null, authMode = 'login';  function authHeaders(json) { const h = {}; if (json) h['Content-Type'] = 'application/json'; if (AUTH_TOKEN) h['Authorization'] = 'Bearer ' + AUTH_TOKEN; return h; } function authError(msg) { const el = document.getElementById('authError'); el.textContent = msg \vert{}\vert{} ''; el.classList.toggle('hidden', !msg); } function showAuth(msg) { document.getElementById('authOverlay').classList.remove('hidden'); setAuthTab(authMode); authError(msg \vert{}\vert{} ''); } function hideAuth() { document.getElementById('authOverlay').classList.add('hidden'); }  function setAuthTab(mode) { authMode = mode; const reg = mode === 'register'; document.getElementById('authNameWrap').classList.toggle('hidden', !reg); document.getElementById('authConfirmWrap').classList.toggle('hidden', !reg); document.getElementById('authPwHint').textContent = reg ? '(minimum 8 characters)' : ''; document.getElementById('authIdHint').textContent = reg ? '(3-20 letters, numbers or _)' : ''; document.getElementById('authFoot').textContent = reg ? 'New accounts start with ₹10,00,000 virtual cash.' : 'No account yet? Click Register above.'; document.getElementById('authPassword').autocomplete = reg ? 'new-password' : 'current-password'; document.getElementById('authSubmit').textContent = reg ? 'Create account' : 'Login'; const on = 'bg-accentBlue text-white', off = 'text-slate-400 hover:text-white'; document.getElementById('authTabLogin').className = 'py-2 rounded-md ' + (reg ? off : on); document.getElementById('authTabRegister').className = 'py-2 rounded-md ' + (reg ? on : off); authError(''); }  async function submitAuth(e) { e.preventDefault(); const userId = document.getElementById('authUser').value.trim().toLowerCase(); const password = document.getElementById('authPassword').value; const name = document.getElementById('authName').value.trim(); const btn = document.getElementById('authSubmit'); if (!userId) return authError('Enter your ID.'); if (!password) return authError('Enter your password.');
   if (authMode === 'register') {
     if (!/^[a-z0-9_]{3,20}$/.test(userId)) return authError('ID must be 3-20 characters: letters, numbers or underscore.');
     if (!name) return authError('Enter your name.');
@@ -855,46 +795,7 @@ async function submitAuth(e) {
   }
   btn.disabled = true; btn.classList.add('opacity-60');
   try {
-    const res = await fetch(`${API_BASE_URL}/auth/${authMode}`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(authMode === 'register' ? { name, userId, password } : { userId, password })
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      if (data.code === 'NOT_REGISTERED') { setAuthTab('register'); return authError('No account found with this ID. Please register to continue.'); }
-      return authError(data.error || 'Something went wrong. Please try again.');
-    }
-    try { localStorage.setItem(AUTH_STORE, data.token); } catch (err) {}
-    document.getElementById('authPassword').value = ''; document.getElementById('authConfirm').value = '';
-    applySession(data.token, data.user);
-  } catch (err) {
-    authError('Cannot reach the server. Make sure the backend is running (npm start).');
-  } finally { btn.disabled = false; btn.classList.remove('opacity-60'); }
-}
-
-function applySession(token, user) {
-  AUTH_TOKEN = token; CURRENT_USER = user; USER_ID = user.userId;
-  userAccount = { cash: 1000000, holdings: {}, history: [] }; // clear any previous user's data
-  const initial = (user.name || user.userId || 'U').trim().charAt(0).toUpperCase();
-  document.getElementById('userChipName').textContent = user.name || user.userId;
-  document.getElementById('userChip').classList.remove('hidden');
-  document.getElementById('profName').textContent = user.name || user.userId;
-  document.getElementById('profAvatar').textContent = initial;
-  document.getElementById('profId').textContent = '@' + user.userId;
-  document.getElementById('profJoined').textContent = user.createdAt ? 'Joined ' + new Date(user.createdAt).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }) : '';
-  const isAdmin = user.role === 'admin';
-  document.getElementById('tabBtn-admin').classList.toggle('hidden', !isAdmin);
-  if (!isAdmin && !document.getElementById('view-admin').classList.contains('hidden')) switchTab('terminal');
-  hideAuth(); refreshUI();
-  syncUserDataFromBackend().then(() => { renderPortfolioView(); if (typeof calculateOrderEstimate === 'function') calculateOrderEstimate(); });
-}
-
-async function initAuth() {
-  let token = null;
-  try { token = localStorage.getItem(AUTH_STORE); } catch (e) {}
-  if (!token) return showAuth();
-  try {
-    const res = await fetch(`${API_BASE_URL}/auth/me`, { headers: { Authorization: 'Bearer ' + token } });
+    const res = await fetch(`${API_BASE_URL}/auth/${authMode}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(authMode === 'register' ? { name, userId, password } : { userId, password }) }); const data = await res.json().catch(() => ({})); if (!res.ok) { if (data.code === 'NOT_REGISTERED') { setAuthTab('register'); return authError('No account found with this ID. Please register to continue.'); } return authError(data.error \vert{}\vert{} 'Something went wrong. Please try again.'); } try { localStorage.setItem(AUTH_STORE, data.token); } catch (err) {} document.getElementById('authPassword').value = ''; document.getElementById('authConfirm').value = ''; applySession(data.token, data.user); } catch (err) { authError('Cannot reach the server. Make sure the backend is running (npm start).'); } finally { btn.disabled = false; btn.classList.remove('opacity-60'); } }  function applySession(token, user) { AUTH_TOKEN = token; CURRENT_USER = user; USER_ID = user.userId; userAccount = { cash: 1000000, holdings: {}, history: [] }; const initial = (user.name \vert{}\vert{} user.userId \vert{}\vert{} 'U').trim().charAt(0).toUpperCase(); document.getElementById('userChipName').textContent = user.name \vert{}\vert{} user.userId; document.getElementById('userChip').classList.remove('hidden'); document.getElementById('profName').textContent = user.name \vert{}\vert{} user.userId; document.getElementById('profAvatar').textContent = initial; document.getElementById('profId').textContent = '@' + user.userId; document.getElementById('profJoined').textContent = user.createdAt ? 'Joined ' + new Date(user.createdAt).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }) : ''; const isAdmin = user.role === 'admin'; document.getElementById('tabBtn-admin').classList.toggle('hidden', !isAdmin); if (!isAdmin && !document.getElementById('view-admin').classList.contains('hidden')) switchTab('terminal'); hideAuth(); refreshUI(); syncUserDataFromBackend().then(() => { renderPortfolioView(); if (typeof calculateOrderEstimate === 'function') calculateOrderEstimate(); }); }  async function initAuth() { let token = null; try { token = localStorage.getItem(AUTH_STORE); } catch (e) {} if (!token) return showAuth(); try { const res = await fetch(`${API_BASE_URL}/auth/me`, { headers: { Authorization: 'Bearer ' + token } });
     if (res.ok) return applySession(token, await res.json());
     try { localStorage.removeItem(AUTH_STORE); } catch (e) {}
     showAuth(res.status === 401 ? 'Your session expired. Please log in again.' : '');
@@ -1118,15 +1019,14 @@ function applyNameToUI() {
       body.innerHTML = g.lessons.map((l, i) => `
         <details class="border border-borderDark rounded-lg bg-tradeDark/50" ${i === (idx || 0) ? 'open' : ''}>
           <summary class="cursor-pointer select-none p-3 flex items-center gap-3 text-sm font-semibold text-white">
-            <input type="checkbox" ${done.includes(i) ? 'checked' : ''} onclick="event.stopPropagation()" onchange="acToggle('${key}', ${i}, this.checked)" title="Mark as done" class="accent-blue-500"/>
+            <input type="checkbox" ${done.includes(i) ? 'checked' : ''} onclick="event.stopPropagation()" onchange="acToggle('${key}',${i}, this.checked)" title="Mark as done" class="accent-blue-500"/>
             <span>${esc(l.t)}</span>
           </summary>
           <div class="px-4 pb-4 text-xs text-slate-300 space-y-3">
             <p class="text-slate-400">${esc(l.why)}</p>
             <ol class="list-decimal ml-5 space-y-1.5">${l.steps.map(s => `<li>${esc(s)}</li>`).join('')}</ol>
             <div class="flex flex-wrap items-center gap-3 bg-blue-950/30 border border-blue-900/40 rounded-lg p-3">
-              <span class="text-blue-300"><i class="fa-solid fa-flask mr-1"></i><b>Try it:</b> ${esc(l.tryIt.text)}</span>
-              ${(l.tryIt.sym || l.tryIt.tab) ? `<button onclick="acTry(${l.tryIt.sym ? `'${l.tryIt.sym}'` : 'null'}, ${l.tryIt.tab ? `'${l.tryIt.tab}'` : 'null'})" class="px-2.5 py-1 rounded bg-accentBlue text-white font-semibold">Go</button>` : ''}
+              <span class="text-blue-300"><i class="fa-solid fa-flask mr-1"></i><b>Try it:</b> ${esc(l.tryIt.text)}</span>${(l.tryIt.sym || l.tryIt.tab) ? `<button onclick="acTry(${l.tryIt.sym ? `'${l.tryIt.sym}'` : 'null'}, ${l.tryIt.tab ? `'${l.tryIt.tab}'` : 'null'})" class="px-2.5 py-1 rounded bg-accentBlue text-white font-semibold">Go</button>` : ''}
             </div>
           </div>
         </details>`).join('') + (key === 'risk' ? calcHTML() : '');
@@ -1190,15 +1090,14 @@ function applyNameToUI() {
     if (syms.length > 0 && cashPct < 10) add('warn', `Only ${cashPct.toFixed(0)}% of your money is in cash. Keep a 10% to 20% reserve so one bad day cannot force you to sell.`, 'risk', 3);
     if (syms.length > 0) {
       const top = syms.reduce((a, b) => vals[a] > vals[b] ? a : b), share = vals[top] / hv * 100;
-      if (syms.length >= 2 && share > 40) add('warn', `${top} is ${share.toFixed(0)}% of your invested money. Aim for less than about 20% in one stock.`, 'strategy', 2);
+      if (syms.length >= 2 && share > 40) add('warn', `${top} is${share.toFixed(0)}% of your invested money. Aim for less than about 20% in one stock.`, 'strategy', 2);
       else if (syms.length === 1 && hv / net > 0.3) add('warn', `All your invested money is in one stock (${top}). Spread across more stocks and sectors.`, 'strategy', 2);
       else if (syms.length < 5 && hv / net > 0.5) add('info', `You hold ${syms.length} stocks. Moving toward 8 to 15 across several sectors lowers risk.`, 'strategy', 2);
       syms.forEach(s => {
         const pct = ((((marketData[s] && marketData[s].price) || H[s].avgPrice) - H[s].avgPrice) / H[s].avgPrice) * 100;
-        if (pct <= -10) add('warn', `${s} is down ${Math.abs(pct).toFixed(1)}% from your buy price. Check your original reason. If it is broken, exit per your stop-loss instead of hoping.`, 'risk', 1);
+        if (pct <= -10) add('warn', `${s} is down${Math.abs(pct).toFixed(1)}% from your buy price. Check your original reason. If it is broken, exit per your stop-loss instead of hoping.`, 'risk', 1);
       });
     }
-    // realised results
     const pos = {}, wins = [], losses = [];
     [...hist].reverse().forEach(t => {
       const p = pos[t.symbol] || (pos[t.symbol] = { q: 0, c: 0 });
@@ -1232,7 +1131,7 @@ function applyNameToUI() {
     const col = { warn: 'border-amber-800/50 bg-amber-950/20 text-amber-300', info: 'border-blue-900/50 bg-blue-950/20 text-blue-300', good: 'border-emerald-800/50 bg-emerald-950/20 text-emerald-300' };
     const ic = { warn: 'fa-triangle-exclamation', info: 'fa-circle-info', good: 'fa-circle-check' };
     document.getElementById('acCoachTips').innerHTML = analyze().map(t =>
-      `<div class="border rounded-lg p-3 text-xs ${col[t.type]}"><i class="fa-solid ${ic[t.type]} mr-2"></i>${esc(t.text)}<div class="mt-2"><button onclick="openGuide('${t.g}', ${t.i})" class="underline text-slate-200 hover:text-white">Open the related lesson</button></div></div>`).join('');
+      `<div class="border rounded-lg p-3 text-xs ${col[t.type]}"><i class="fa-solid ${ic[t.type]} mr-2"></i>${esc(t.text)}<div class="mt-2"><button onclick="openGuide('${t.g}',${t.i})" class="underline text-slate-200 hover:text-white">Open the related lesson</button></div></div>`).join('');
   }
   window.acSetLevel = l => { store.level = l; save(); renderCoach(); };
 
@@ -1273,7 +1172,7 @@ function applyNameToUI() {
           <div class="text-xs text-white font-semibold">${esc(n.title)}</div>
           <div class="flex flex-wrap items-center gap-2 mt-1.5 text-[10px] text-slate-500">
             ${n.symbol ? `<span class="px-1.5 py-0.5 rounded bg-blue-950 text-blue-300 font-mono">${esc(n.symbol)}</span>` : ''}
-            <span>${esc(n.source || '')}</span><span>${esc(ago(n.pubDate))}</span>
+            <span>${esc(n.source \vert{}\vert{} '')}</span><span>${esc(ago(n.pubDate))}</span>
             <span class="px-1.5 py-0.5 rounded border ${tone[1]}" title="Headline tone is only a hint, not a price prediction">${tone[0]}</span>
           </div></a>`;
       }).join('');

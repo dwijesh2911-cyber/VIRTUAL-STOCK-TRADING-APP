@@ -56,8 +56,8 @@ function auth(req, res, next) {
 }
 const wrap = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
-/* ---------- Health ---------- */
-app.get('/', (req, res) => res.json({ ok: true, service: 'ApexTrader API' }));
+/* ---------- Serve Frontend & Health ---------- */
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
 /* ---------- Auth ---------- */
@@ -216,7 +216,6 @@ function init() {
   return ready;
 }
 
-// Local run (npm start) still works; Vercel skips this block
 if (require.main === module) {
   init()
     .then(() => app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Server running on port ${PORT}`)))
