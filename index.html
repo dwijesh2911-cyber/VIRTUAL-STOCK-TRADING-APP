@@ -7,8 +7,8 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
   <script>
-    // Same-origin when served by server.js (localhost:5000 or your deployed URL); otherwise talk to the local backend
-    const API_BASE_URL = (location.protocol.startsWith('http') && (location.port === '5000' || !['localhost', '127.0.0.1'].includes(location.hostname)))
+    // Same-origin when (served by server.js (localhost:5000 or your deployed URL); otherwise talk to the local backend
+    const API_BASE_URL = 'https://virtual-stock-trading-app.onrender.com/api';
       ? '/api' : 'http://localhost:5000/api';
   </script>
   <style>
