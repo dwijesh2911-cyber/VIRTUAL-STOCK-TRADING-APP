@@ -6,13 +6,15 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const axios = require('axios');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
 
-/* ---------- CORS: allow GitHub Pages + local dev ---------- */
+/* ---------- CORS: allow GitHub Pages, Render & local dev ---------- */
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS ||
-  'https://dwijesh2911-cyber.github.io,http://localhost:5000,http://127.0.0.1:5000')
+  'https://dwijesh2911-cyber.github.io,https://virtual-stock-trading-app-b2c3.onrender.com,http://localhost:5000,http://127.0.0.1:5000,http://localhost:5500,http://127.0.0.1:5500')
   .split(',').map(s => s.trim()).filter(Boolean);
+
 app.use(cors({
   origin: (origin, cb) => (!origin || ALLOWED_ORIGINS.includes(origin)) ? cb(null, true) : cb(null, false),
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -57,7 +59,11 @@ function auth(req, res, next) {
 const wrap = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 /* ---------- Serve Frontend & Health ---------- */
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+app.get('/', (req, res) => {
+  const indexPath = path.join(__dirname, 'index.html');
+  if (fs.existsSync(indexPath)) return res.sendFile(indexPath);
+  res.json({ ok: true, service: 'ApexTrader API' });
+});
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
 /* ---------- Auth ---------- */
